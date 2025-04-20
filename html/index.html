@@ -88,6 +88,19 @@
             background-color: #d9534f;
             border-color: #d43f3a;
         }
+        
+        .video-container {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+        
+        .video-container img {
+            width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
     </style>
     <title>{{AppTitle}} v{{AppVersion}}</title>
 </head>
@@ -103,7 +116,11 @@
                 settings</button>
         </h3>
     </div>
-
+    
+    <div class="video-container">
+        <h2 class="text-center">Video Preview</h2>
+        <img src="/snapshot" alt="Video Preview">
+    </div>
 
     <h2 class="text-center">ESP32</h2>
     <div class="flex-table">
@@ -167,84 +184,36 @@
     </div>
     {{/NetworkState.OnLine}}
 
-    <h2 class="text-center">Camera</h2>
+    <h2 class="text-center">Video</h2>
     <div class="flex-table">
         <div class="row">Frame rate:</div>
         <div>{{FrameDuration}} ms ({{FrameFrequency}} f/s)</div>
-        <div class="row">Frame size:</div>
-        <div>{{FrameSize}}</div>
-        <div class="row">JPEG quality:</div>
-        <div>{{JpegQuality}} [1-100]</div>
-        <div class="row">Brightness:</div>
-        <div>{{Brightness}} [-2,2]</div>
-        <div class="row">Contrast:</div>
-        <div>{{Contrast}} [-2,2]</div>
-        <div class="row">Saturation:</div>
-        <div>{{Saturation}} [-2,2]</div>
-        <div class="row">Special effect:</div>
-        <div>{{SpecialEffect}}</div>
-        <div class="row">White balance:</div>
-        <div>{{#WhiteBal}}Auto{{/WhiteBal}}{{^WhiteBal}}Manual{{/WhiteBal}}</div>
-        <div class="row">AWB gain:</div>
-        <div>{{#AwbGain}}Auto{{/AwbGain}}{{^AwbGain}}Manual{{/AwbGain}}</div>
-        <div class="row">WB mode:</div>
-        <div>{{WbMode}}</div>
-        <div class="row">Exposure control:</div>
-        <div>{{#ExposureCtrl}}Auto{{/ExposureCtrl}}{{^ExposureCtrl}}Manual{{/ExposureCtrl}}</div>
-        <div class="row">Auto exposure control (dsp):</div>
-        <div>{{#Aec2}}Enabled{{/Aec2}}{{^Aec2}}Disabled{{/Aec2}}</div>
-        <div class="row">Auto Exposure level:</div>
-        <div>{{AeLevel}}</div>
-        <div class="row">Manual exposure value:</div>
-        <div>{{AecValue}}</div>
-        <div class="row">Gain control:</div>
-        <div>{{#GainCtrl}}Auto{{/GainCtrl}}{{^GainCtrl}}Manual{{/GainCtrl}}</div>
-        <div class="row">AGC gain:</div>
-        <div>{{AgcGain}}</div>
-        <div class="row">Gain ceiling:</div>
-        <div>{{GainCeiling}}</div>
-        <div class="row">Black pixel correct:</div>
-        <div>{{#Bpc}}Auto{{/Bpc}}{{^Bpc}}Manual{{/Bpc}}</div>
-        <div class="row">White pixel correct:</div>
-        <div>{{#Wpc}}Auto{{/Wpc}}{{^Wpc}}Manual{{/Wpc}}</div>
-        <div class="row">Gamma correct:</div>
-        <div>{{#RawGma}}Enabled{{/RawGma}}{{^RawGma}}Disabled{{/RawGma}}</div>
-        <div class="row">Lens correction:</div>
-        <div>{{#Lenc}}Enabled{{/Lenc}}{{^Lenc}}Disabled{{/Lenc}}</div>
-        <div class="row">Horizontal mirror:</div>
-        <div>{{#HMirror}}Mirrored{{/HMirror}}{{^HMirror}}Normal{{/HMirror}}</div>
-        <div class="row">Vertical flip:</div>
-        <div>{{#VFlip}}Flipped{{/VFlip}}{{^VFlip}}Normal{{/VFlip}}</div>
-        <div class="row">Downsize enable:</div>
-        <div>{{#Dcw}}Enabled{{/Dcw}}{{^Dcw}}Disabled{{/Dcw}}</div>
-        <div class="row">Color bar:</div>
-        <div>{{#ColorBar}}Enabled{{/ColorBar}}{{^ColorBar}}Camera{{/ColorBar}}</div>
+        <div class="row">Video quality:</div>
+        <div>{{VideoQuality}} [1-100]</div>
     </div>
 
-    {{#CameraInitialized}}
+    {{#VideoInitialized}}
     <div class="alert alert-success">
-        <h3 class="text-center">Camera was initialized successfully!</h3>
+        <h3 class="text-center">Video provider was initialized successfully!</h3>
     </div>
-    {{/CameraInitialized}}
-    {{^CameraInitialized}}
+    {{/VideoInitialized}}
+    {{^VideoInitialized}}
     <div class="alert alert-danger">
-        <h3 class="text-center">Failed to initialize the camera!<br>
-            Result: {{CameraInitResult}} ({{CameraInitResultText}})<br>
-            Please check hardware or correct the camera settings and restart.<br><br>
+        <h3 class="text-center">Failed to initialize the video provider!<br>
+            Please check if video data is properly uploaded and restart.<br><br>
             <button type="button" class="btn btn-danger" onclick="location.href='restart'">Restart</button>
         </h3>
     </div>
-    {{/CameraInitialized}}
-
+    {{/VideoInitialized}}
 
     <h2 class="text-center">Special URLs / API</h2>
     <div class="flex-table">
-        <div class="row">RTSP camera stream:</div>
+        <div class="row">RTSP video stream:</div>
         <div><a href="rtsp://{{IPv4}}:{{RtspPort}}/mjpeg/1">rtsp://{{IPv4}}:{{RtspPort}}/mjpeg/1</a></div>
         <div class="row">JPEG Motion stream:</div>
         <div><a href="http://{{IPv4}}/stream" target="_blank" rel="noopener">http://{{IPv4}}/stream</a></div>
-        <div class="row">Snapshot of the camera:</div>
-        <div><a href="http://{{IPv4}}/snapshot " target="_blank" rel="noopener">http://{{IPv4}}/snapshot</a> </div>
+        <div class="row">Snapshot of the video:</div>
+        <div><a href="http://{{IPv4}}/snapshot" target="_blank" rel="noopener">http://{{IPv4}}/snapshot</a> </div>
     </div>
 
 </body>
