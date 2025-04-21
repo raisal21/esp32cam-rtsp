@@ -1,11 +1,15 @@
+#pragma once
+
 #include <Arduino.h>
-#include <SPIFFS.h>
+#include "FS.h"
+#include "SPIFFS.h"
+#include <WiFi.h>
 #include <esp_camera.h>
 
 class VideoFrameProvider {
 private:
     // Storage for video frames
-    uint8_t* frameBuffer;
+    uint8_t* frameBuffer;   
     size_t frameBufferSize;
     
     // Frame metadata

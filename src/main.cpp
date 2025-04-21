@@ -3,9 +3,11 @@
 #include <soc/rtc_cntl_reg.h>
 #include <IotWebConf.h>
 #include <ESPmDNS.h>
-#include <SPIFFS.h>
-#include "VideoFrameProvider.h" // Our new class
-#include <rtsp_server_video.h>  // Modified RTSP server
+#include "FS.h"
+#include "SPIFFS.h"
+#include <WiFi.h>
+#include "VideoFrameProvider.h" 
+#include "rtsp_server_video.h"  
 #include <format_duration.h>
 #include <format_number.h>
 #include <moustache.h>
@@ -14,10 +16,19 @@
 // HTML files
 extern const char index_html_min_start[] asm("_binary_html_index_min_html_start");
 
-// Parameter groups and parameters
-auto param_group_video = iotwebconf::ParameterGroup("video", "Video settings");
-auto param_frame_duration = iotwebconf::Builder<iotwebconf::UIntTParameter<unsigned long>>("fd").label("Frame duration (ms)").defaultValue(DEFAULT_FRAME_DURATION).min(10).build();
-auto param_video_quality = iotwebconf::Builder<iotwebconf::UIntTParameter<byte>>("q").label("Video quality").defaultValue(DEFAULT_JPEG_QUALITY).min(1).max(100).build();
+// Parameter values storage
+char param_frame_duration_value[12]; // Enough for a number up to 9999
+char param_video_quality_value[4];   // Enough for a number up to 100
+
+// Parameter groups and parameters - fixed to use standard IotWebConf parameters
+iotwebconf::ParameterGroup param_group_video("video", "Video settings");
+// Fix: Using the correct constructor signature for NumberParameter
+iotwebconf::NumberParameter param_frame_duration("fd", "Frame duration (ms)", 
+                                               param_frame_duration_value, 
+                                               sizeof(param_frame_duration_value));
+iotwebconf::NumberParameter param_video_quality("q", "Video quality", 
+                                              param_video_quality_value, 
+                                              sizeof(param_video_quality_value));
 
 // Video Frame Provider
 VideoFrameProvider videoProvider;
@@ -31,6 +42,7 @@ std::unique_ptr<rtsp_server_video> video_server;
 // Web server
 WebServer web_server(80);
 
+// Create thing name with unique identifier
 auto thingName = String(WIFI_SSID) + "-" + String(ESP.getEfuseMac(), 16);
 IotWebConf iotWebConf(thingName.c_str(), &dnsServer, &web_server, WIFI_PASSWORD, CONFIG_VERSION);
 
@@ -53,6 +65,19 @@ void handle_root()
   const char *wifi_modes[] = {"NULL", "STA", "AP", "STA+AP"};
   auto ipv4 = WiFi.getMode() == WIFI_MODE_AP ? WiFi.softAPIP() : WiFi.localIP();
   auto ipv6 = WiFi.getMode() == WIFI_MODE_AP ? WiFi.softAPIPv6() : WiFi.localIPv6();
+
+  // Get numeric values from the parameter strings
+  unsigned long frameDuration = DEFAULT_FRAME_DURATION;
+  byte videoQuality = DEFAULT_JPEG_QUALITY;
+  
+  // Parse the parameters from strings to numbers
+  if (strlen(param_frame_duration_value) > 0) {
+    frameDuration = atol(param_frame_duration_value);
+  }
+  
+  if (strlen(param_video_quality_value) > 0) {
+    videoQuality = atoi(param_video_quality_value);
+  }
 
   moustache_variable_t substitutions[] = {
       // Version / CPU
@@ -84,9 +109,9 @@ void handle_root()
       {"NetworkState.ApMode", String(iotWebConf.getState() == iotwebconf::NetworkState::ApMode)},
       {"NetworkState.OnLine", String(iotWebConf.getState() == iotwebconf::NetworkState::OnLine)},
       // Video
-      {"FrameDuration", String(param_frame_duration.value())},
-      {"FrameFrequency", String(1000.0 / param_frame_duration.value(), 1)},
-      {"VideoQuality", String(param_video_quality.value())},
+      {"FrameDuration", String(frameDuration)},
+      {"FrameFrequency", String(1000.0 / frameDuration, 1)},
+      {"VideoQuality", String(videoQuality)},
       {"VideoInitialized", String(video_init_result == ESP_OK)},
       // RTSP
       {"RtspPort", String(RTSP_PORT)}
@@ -167,7 +192,14 @@ void handle_stream()
 bool initialize_video_provider()
 {
   log_v("initialize_video_provider");
-  log_i("Frame duration: %d ms", param_frame_duration.value());
+  unsigned long frameDuration = DEFAULT_FRAME_DURATION;
+  
+  // Parse the frame duration from string to number
+  if (strlen(param_frame_duration_value) > 0) {
+    frameDuration = atol(param_frame_duration_value);
+  }
+  
+  log_i("Frame duration: %lu ms", frameDuration);
   
   // Initialize SPIFFS if not already initialized
   if (!SPIFFS.begin(true)) {
@@ -176,7 +208,7 @@ bool initialize_video_provider()
   }
   
   // Initialize the video provider
-  if (!videoProvider.init("/video_frames.bin", param_frame_duration.value())) {
+  if (!videoProvider.init("/video_frames.bin", frameDuration)) {
     log_e("Failed to initialize video provider");
     return false;
   }
@@ -187,7 +219,14 @@ bool initialize_video_provider()
 void start_rtsp_server()
 {
   log_v("start_rtsp_server");
-  video_server = std::unique_ptr<rtsp_server_video>(new rtsp_server_video(videoProvider, param_frame_duration.value(), RTSP_PORT));
+  unsigned long frameDuration = DEFAULT_FRAME_DURATION;
+  
+  // Parse the frame duration from string to number
+  if (strlen(param_frame_duration_value) > 0) {
+    frameDuration = atol(param_frame_duration_value);
+  }
+  
+  video_server = std::unique_ptr<rtsp_server_video>(new rtsp_server_video(videoProvider, frameDuration, RTSP_PORT));
   // Add RTSP service to mDNS
   // HTTP is already set by iotWebConf
   MDNS.addService("rtsp", "tcp", RTSP_PORT);
@@ -206,8 +245,17 @@ void on_connected()
 void on_config_saved()
 {
   log_v("on_config_saved");
+  // Parse the frame duration from string to number
+  float fps = 10.0f; // Default
+  if (strlen(param_frame_duration_value) > 0) {
+    unsigned long frameDuration = atol(param_frame_duration_value);
+    if (frameDuration > 0) {
+      fps = 1000.0f / frameDuration;
+    }
+  }
+  
   // Update settings
-  videoProvider.setFps(1000.0f / param_frame_duration.value());
+  videoProvider.setFps(fps);
 }
 
 void setup()
@@ -239,6 +287,11 @@ void setup()
     log_e("Failed to mount SPIFFS");
   }
 
+  // Set default values
+  snprintf(param_frame_duration_value, sizeof(param_frame_duration_value), "%lu", DEFAULT_FRAME_DURATION);
+  snprintf(param_video_quality_value, sizeof(param_video_quality_value), "%d", DEFAULT_JPEG_QUALITY);
+  
+  // Add parameters to the group
   param_group_video.addItem(&param_frame_duration);
   param_group_video.addItem(&param_video_quality);
   iotWebConf.addParameterGroup(&param_group_video);
